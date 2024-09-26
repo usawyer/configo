@@ -1,4 +1,4 @@
-package configManager
+package configo
 
 import (
 	"fmt"
