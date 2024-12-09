@@ -74,7 +74,7 @@ In this example:
 
 ```go
 settings := configo.Settings{
-    ConfigFilePath:    "./config.yml", // Path to your YAML configuration file
+    ConfigFilePath:    "./config.yml", // Name to your YAML configuration file
 }
 
 cm, err := configo.NewConfigManager[AppConfig](settings)
@@ -266,7 +266,7 @@ cm.PrintEnvHelp()
 Example output:
 
 
-```php
+```
 Environment Variables:
 	DATABASE_URL         string     Database connection URL (default: postgres://localhost:5432/db)
 	DATABASE_USERNAME    string     Database username (default: )

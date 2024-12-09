@@ -3,17 +3,14 @@ package parser
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 )
 
 type ConfigDescription struct {
 	ConfigNode *ConfigNode
-	Env        struct {
-		IsExist bool
-		Path    string
-	}
-	ValueType reflect.Kind
-	Default   struct {
+	ValueType  reflect.Kind
+	Default    struct {
 		IsExist bool
 		Value   interface{}
 	}
@@ -21,6 +18,7 @@ type ConfigDescription struct {
 type ConfigNode struct {
 	FieldName   string
 	Description string
+	EnvName     string // from tag
 	Children    []*ConfigNode
 	Parent      *ConfigNode
 	Level       int
@@ -28,21 +26,42 @@ type ConfigNode struct {
 	ConfigDescription *ConfigDescription
 }
 
-// GenerateEnv генерирует env на основе пути к конфигу без учета переопределения тегом env
-func (r *ConfigNode) GenerateEnv() string {
-	if r.Parent != nil {
-		return strings.ToUpper(strings.Join(r.GetFullPathParts(), "_"))
-	}
-	// Если у узла нет родителя (т.е. это корневой узел), то у него нет env тк корневой всегда один - root
-	return ""
+//// GenerateEnv генерирует env на основе пути к конфигу без учета переопределения тегом env
+//func (r *ConfigNode) GenerateEnv() string {
+//	if r.Parent != nil {
+//		return strings.ToUpper(strings.Join(r.GetFullPathParts(), "_"))
+//	}
+//	// Если у узла нет родителя (т.е. это корневой узел), то у него нет env тк корневой всегда один - root
+//	return ""
+//}
+
+// GetEnv отдает итоговый env с учетом переопределения через тег
+func (r *ConfigNode) isRootNode() bool {
+	return r.Parent == nil
 }
 
 // GetEnv отдает итоговый env с учетом переопределения через тег
-func (r *ConfigNode) GetEnv() string {
-	if r.ConfigDescription.Env.IsExist {
-		return r.ConfigDescription.Env.Path
+func (r *ConfigNode) GetEnv() (env string, exist bool) {
+	if r.EnvName == "-" {
+		return "", false
 	}
-	return r.GenerateEnv()
+	if r.EnvName != "" {
+		return strings.ToUpper(r.EnvName), true
+	}
+	var pathParts []string
+	for _, node := range r.GetAllParentNodes() {
+		if r.EnvName == "-" {
+			return "", false
+		}
+		if node.EnvName != "" {
+			pathParts = append(pathParts, node.EnvName)
+		} else {
+			pathParts = append(pathParts, node.FieldName)
+		}
+	}
+	pathParts = append(pathParts, r.FieldName)
+
+	return strings.ToUpper(strings.Join(pathParts, "_")), true
 }
 
 func NewRootNode() *ConfigNode {
@@ -85,9 +104,10 @@ func (r *ConfigNode) GetAllLeaves() []*ConfigNode {
 
 func (r *ConfigNode) GetAllParentNodes() []*ConfigNode {
 	var nodes []*ConfigNode
-	for current := r.Parent; current != nil; current = current.Parent {
+	for current := r.Parent; !current.isRootNode(); current = current.Parent {
 		nodes = append(nodes, current)
 	}
+	slices.Reverse(nodes)
 	return nodes
 }
 
@@ -101,16 +121,11 @@ func (r *ConfigNode) AddChildNode(node *ConfigNode) error {
 	return nil
 }
 
-func (r *ConfigNode) SetConfigDescription(ValueType reflect.Kind, isDefaultExist bool, defaultValue interface{}, env string) error {
+func (r *ConfigNode) SetConfigDescription(ValueType reflect.Kind, isDefaultExist bool, defaultValue interface{}) error {
 	if len(r.Children) > 0 {
 		return fmt.Errorf("children in node != 0. setting item to node is not possible, node: %s", r.FieldName)
 	}
 	r.ConfigDescription = &ConfigDescription{
-		Env: struct {
-			IsExist bool
-			Path    string
-		}{IsExist: false, Path: ""},
-
 		ValueType: ValueType,
 		Default: struct {
 			IsExist bool
@@ -119,11 +134,6 @@ func (r *ConfigNode) SetConfigDescription(ValueType reflect.Kind, isDefaultExist
 			IsExist: isDefaultExist,
 			Value:   defaultValue,
 		},
-	}
-
-	if len(env) > 0 {
-		r.ConfigDescription.Env.IsExist = true
-		r.ConfigDescription.Env.Path = strings.ToUpper(env)
 	}
 
 	return nil

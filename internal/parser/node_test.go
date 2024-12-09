@@ -25,7 +25,7 @@ func TestAddChildNode(t *testing.T) {
 
 func TestAddChildToConfigNodeWithDescription(t *testing.T) {
 	root := NewRootNode()
-	root.SetConfigDescription(reflect.String, true, "default", "")
+	root.SetConfigDescription(reflect.String, true, "default")
 
 	child := NewConfigNode("child1", "description")
 	err := root.AddChildNode(child)
@@ -35,13 +35,13 @@ func TestAddChildToConfigNodeWithDescription(t *testing.T) {
 func TestSetConfigDescription(t *testing.T) {
 	root := NewRootNode()
 	node := NewConfigNode("child1", "description")
-	err := node.SetConfigDescription(reflect.String, true, "default", "")
+	err := node.SetConfigDescription(reflect.String, true, "default")
 	assert.NoError(t, err)
 	root.AddChildNode(node)
 
 	assert.NotNil(t, node.ConfigDescription)
 	assert.Equal(t, reflect.String, node.ConfigDescription.ValueType)
-	assert.Equal(t, "", node.ConfigDescription.Env.Path)
+	assert.Equal(t, "", node.EnvName)
 }
 
 func TestGetFullPathParts(t *testing.T) {
@@ -61,7 +61,7 @@ func TestGetFullPathParts(t *testing.T) {
 func TestGetAllLeaves(t *testing.T) {
 	root := NewRootNode()
 	child := NewConfigNode("child1", "description")
-	child.SetConfigDescription(reflect.Int, true, 10, "")
+	child.SetConfigDescription(reflect.Int, true, 10)
 	root.AddChildNode(child)
 
 	leaves := root.GetAllLeaves()

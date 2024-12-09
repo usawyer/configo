@@ -29,8 +29,14 @@ func parseNode(parentNode *ConfigNode, t reflect.Type) error {
 			return fmt.Errorf("field " + field.Name + " has no 'mapstructure' tag")
 		}
 		descTag := field.Tag.Get("desc")
+		envTag, _ := field.Tag.Lookup("env")
 
 		currentNode := NewConfigNode(fieldName, descTag)
+		currentNode.EnvName = envTag
+		err := parentNode.AddChildNode(currentNode)
+		if err != nil {
+			return err
+		}
 
 		if field.Type.Kind() == reflect.Struct {
 			err := parseNode(currentNode, field.Type)
@@ -43,10 +49,6 @@ func parseNode(parentNode *ConfigNode, t reflect.Type) error {
 				return err
 			}
 		}
-		err := parentNode.AddChildNode(currentNode)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -57,7 +59,6 @@ func parseDescription(configNode *ConfigNode, field reflect.StructField) error {
 	}
 
 	defaultTag, isHasDefaultTag := field.Tag.Lookup("default")
-	envTag, _ := field.Tag.Lookup("env")
 
 	var defaultValue interface{}
 	if isHasDefaultTag {
@@ -91,7 +92,7 @@ func parseDescription(configNode *ConfigNode, field reflect.StructField) error {
 		}
 	}
 
-	err := configNode.SetConfigDescription(field.Type.Kind(), isHasDefaultTag, defaultValue, envTag)
+	err := configNode.SetConfigDescription(field.Type.Kind(), isHasDefaultTag, defaultValue)
 	if err != nil {
 		return err
 	}

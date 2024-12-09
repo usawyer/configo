@@ -2,13 +2,14 @@ package validation
 
 import (
 	"fmt"
-	"github.com/robfig/cron/v3"
 	"net"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/robfig/cron/v3"
 )
 
 // IsValidHostnameOrIP проверяет, допустим ли hostname или IP-адрес

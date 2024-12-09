@@ -8,7 +8,7 @@ import (
 )
 
 type DatabaseConfig struct {
-	URL      string `mapstructure:"url"`
+	URL      string `mapstructure:"url" env:"-"`
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }
@@ -20,7 +20,7 @@ type ServerConfig struct {
 
 type TestConfig struct {
 	AppName  string         `mapstructure:"appName" env:"app"`
-	Database DatabaseConfig `mapstructure:"database"`
+	Database DatabaseConfig `mapstructure:"database" env:"db"`
 	Server   ServerConfig   `mapstructure:"server"`
 	Statuses []string       `mapstructure:"statuses" desc:"Статусы" default:"a,b,c,aa,ab"`
 	Enable   bool           `mapstructure:"enable" desc:"Флаг для включения определенной функции" default:"true"`
@@ -140,14 +140,14 @@ server:
 
 	// Устанавливаем переменные окружения для вложенных полей
 	setEnv(t, "APP", "envapp")
-	setEnv(t, "DATABASE_URL", "postgres://env-db:5432/db")
-	setEnv(t, "DATABASE_USERNAME", "envuser")
+	setEnv(t, "DATABASE_URL", "postgres://env-db:5432/db") // viper по дефолту сам определяет переменную env и это не отменить
+	setEnv(t, "DB_USERNAME", "envuser")
 	setEnv(t, "SERVER_PORT", "9090")
 	setEnv(t, "STATUSES", "a,b")
 	setEnv(t, "ENABLE", "true")
 	defer unsetEnv(t, "APP")
 	defer unsetEnv(t, "DATABASE_URL")
-	defer unsetEnv(t, "DATABASE_USERNAME")
+	defer unsetEnv(t, "DB_USERNAME")
 	defer unsetEnv(t, "SERVER_PORT")
 	defer unsetEnv(t, "STATUSES")
 	defer unsetEnv(t, "ENABLE")
@@ -167,8 +167,8 @@ server:
 	if config.AppName != "envapp" {
 		t.Errorf("Expected AppName to be 'envapp', got '%s'", config.AppName)
 	}
-	if config.Database.URL != "postgres://env-db:5432/db" {
-		t.Errorf("Expected Database.URL to be 'postgres://env-db:5432/db', got '%s'", config.Database.URL)
+	if config.Database.URL != "postgres://env-db:5432/db" { // env:"-" not override viper's default behavior
+		t.Errorf("Expected Database.URL to be 'env-db://localhost:5432/db', got '%s'", config.Database.URL)
 	}
 	if config.Database.Username != "envuser" {
 		t.Errorf("Expected Database.Username to be 'envuser', got '%s'", config.Database.Username)

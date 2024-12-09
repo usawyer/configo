@@ -2,9 +2,10 @@ package configo
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/vsysa/configo/internal/helper"
 	"github.com/vsysa/configo/internal/parser"
-	"os"
 )
 
 // ConfigInspector предоставляет методы для анализа конфигурационной структуры.
@@ -37,26 +38,30 @@ func (ci *ConfigInspector[T]) PrintEnvHelp() {
 	maxLen := 0
 	envCount := 0
 	for _, node := range ci.configTree.GetAllLeaves() {
-		l := len(node.GetEnv())
+		envName, envExist := node.GetEnv()
+		if !envExist {
+			continue
+		}
+		l := len(envName)
 		if l > maxLen {
 			envCount++
 			maxLen = l
 		}
 	}
 	if envCount == 0 {
-		fmt.Fprintln(os.Stderr, "No environment variables defined.")
+		fmt.Fprintln(os.Stdout, "No environment variables defined.")
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "Environment Variables:")
+	fmt.Fprintln(os.Stdout, "Environment Variables:")
 	for _, node := range ci.configTree.GetAllLeaves() {
-		config := node.ConfigDescription
-		if config.Env.IsExist {
+		if envName, envExist := node.GetEnv(); envExist {
+			config := node.ConfigDescription
 			defaultValue := ""
 			if config.Default.IsExist {
 				defaultValue = fmt.Sprintf("(default: %v)", config.Default.Value)
 			}
-			fmt.Fprintf(os.Stderr, "\t%-*s  %-10s  %s %s\n", maxLen, config.Env.Path, config.ValueType.String(), node.Description, defaultValue)
+			fmt.Fprintf(os.Stdout, "\t%-*s  %-10s  %s %s\n", maxLen, envName, config.ValueType.String(), node.Description, defaultValue)
 		}
 	}
 }

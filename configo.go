@@ -3,12 +3,13 @@ package configo
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 	"github.com/vsysa/configo/internal/helper"
 	"github.com/vsysa/configo/internal/parser"
-	"strings"
-	"sync"
 )
 
 const (
@@ -131,11 +132,13 @@ func (r *ConfigManager[T]) setupViper(configPath string) {
 		if item.ConfigDescription.Default.IsExist {
 			Viper.SetDefault(strings.Join(item.GetFullPathParts(), "."), item.ConfigDescription.Default.Value)
 		}
+		// по дефолту viper сам связывает названия с переменными env, но мы это делаем для прозрачности
+		// и на случай если пользователь изменил название переменной. если пользователь написал env:"-",
+		// то автоматическое связывание все равно произойдет
 		// связываем переменную с названием env
-		Viper.BindEnv(strings.Join(item.GetFullPathParts(), "."), item.GetEnv(), item.GenerateEnv())
-		//if item.ConfigDescription.Env.IsExist {
-		//	fmt.Println(item.FieldName, item.ConfigDescription.Env.Path)
-		//}
+		if envName, exist := item.GetEnv(); exist {
+			Viper.BindEnv(strings.Join(item.GetFullPathParts(), "."), envName)
+		}
 	}
 }
 
