@@ -16,14 +16,10 @@ const (
 	DefaultConfigPath = "./config.yml"
 )
 
-type Settings struct {
-	ConfigFilePath string
-}
-
 type ConfigManager[T Configurable] struct {
 	config *T
 
-	settings Settings
+	configFilePath string
 
 	configUpdateNotifier *ConfigUpdateNotifier[T]
 	updateMu             sync.RWMutex
@@ -32,20 +28,24 @@ type ConfigManager[T Configurable] struct {
 	configTree           *parser.ConfigNode
 }
 
-func MustNewConfigManager[T Configurable](managerSettings Settings) *ConfigManager[T] {
-	out, err := NewConfigManager[T](managerSettings)
+func MustNewConfigManager[T Configurable](opts ...Option[T]) *ConfigManager[T] {
+	out, err := NewConfigManager[T](opts...)
 	if err != nil {
 		panic(err)
 	}
 	return out
 }
 
-func NewConfigManager[T Configurable](managerSettings Settings) (*ConfigManager[T], error) {
+func NewConfigManager[T Configurable](opts ...Option[T]) (*ConfigManager[T], error) {
 	r := &ConfigManager[T]{
-		settings:             managerSettings,
+		configFilePath:       DefaultConfigPath,
 		configUpdateNotifier: NewConfigUpdateNotifier[T](),
 		errorHandler:         helper.DefaultHandleError,
 		v:                    viper.New(),
+	}
+
+	for _, opt := range opts {
+		opt(r)
 	}
 
 	var cfg T
@@ -55,12 +55,7 @@ func NewConfigManager[T Configurable](managerSettings Settings) (*ConfigManager[
 		return nil, fmt.Errorf("error parsing config struct: %w", err)
 	}
 
-	configPath := managerSettings.ConfigFilePath
-	if configPath == "" {
-		configPath = DefaultConfigPath
-	}
-
-	r.setupViper(configPath)
+	r.setupViper(r.configFilePath)
 	r.setupWatcher()
 
 	if _, err := r.updateConfig(); err != nil {

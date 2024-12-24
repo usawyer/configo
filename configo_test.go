@@ -83,11 +83,7 @@ Enable: false
 	configPath := createTempYAMLConfig(t, yamlContent)
 	defer os.Remove(configPath)
 
-	settings := Settings{
-		ConfigFilePath: configPath,
-	}
-
-	cm, err := NewConfigManager[TestConfig](settings)
+	cm, err := NewConfigManager[TestConfig](WithConfigFilePath[TestConfig](configPath))
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -152,11 +148,7 @@ server:
 	defer unsetEnv(t, "STATUSES")
 	defer unsetEnv(t, "ENABLE")
 
-	settings := Settings{
-		ConfigFilePath: configPath,
-	}
-
-	cm, err := NewConfigManager[TestConfig](settings)
+	cm, err := NewConfigManager[TestConfig](WithConfigFilePath[TestConfig](configPath))
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -204,11 +196,7 @@ server:
 	configPath := createTempYAMLConfig(t, yamlContent)
 	defer os.Remove(configPath)
 
-	settings := Settings{
-		ConfigFilePath: configPath,
-	}
-
-	cm, err := NewConfigManager[TestConfig](settings)
+	cm, err := NewConfigManager[TestConfig](WithConfigFilePath[TestConfig](configPath))
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
