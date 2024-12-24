@@ -3,6 +3,9 @@ package parser
 import (
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Тест для ParseConfigStruct: проверка правильного парсинга структуры с тегами.
@@ -114,4 +117,100 @@ func TestParseDescription(t *testing.T) {
 	if node.ConfigDescription.Default.Value != "hello" {
 		t.Errorf("Expected default value 'hello', got %v", node.ConfigDescription.Default.Value)
 	}
+}
+
+func TestParseConfigStruct_ArrayOfStructs(t *testing.T) {
+	type Signal struct {
+		Label string `mapstructure:"label" desc:"Signal label" default:"default_label"`
+		Do    int    `mapstructure:"do" desc:"Signal action" default:"1"`
+	}
+
+	type Device struct {
+		Host    string   `mapstructure:"host" desc:"Device host"`
+		Port    int      `mapstructure:"port" desc:"Device port"`
+		Signals []Signal `mapstructure:"signals" desc:"List of signals"`
+	}
+
+	type TestConfig struct {
+		Devices []Device `mapstructure:"devices" desc:"List of devices"`
+	}
+
+	var cfg TestConfig
+	rootNode, err := ParseConfigStruct(cfg)
+	require.NoError(t, err, "Unexpected error during parsing config")
+
+	require.Len(t, rootNode.Children, 1, "Expected 1 child node at the root level")
+
+	devicesNode := rootNode.Children[0]
+	assert.Equal(t, "devices", devicesNode.FieldName, "Expected first child node to be 'devices'")
+	assert.True(t, devicesNode.IsArrayOfStructs, "Expected 'devices' node to be marked as array")
+
+	require.Len(t, devicesNode.Children, 3, "Expected 3 children for 'devices' (host, port, signals)")
+
+	hostNode := devicesNode.Children[0]
+	assert.Equal(t, "host", hostNode.FieldName, "Expected first child of 'devices' to be 'host'")
+
+	signalsNode := devicesNode.Children[2]
+	assert.Equal(t, "signals", signalsNode.FieldName, "Expected third child of 'devices' to be 'signals'")
+	assert.True(t, signalsNode.IsArrayOfStructs, "Expected 'signals' node to be marked as array")
+
+	require.Len(t, signalsNode.Children, 2, "Expected 2 children for 'signals' (label, do)")
+
+	labelNode := signalsNode.Children[0]
+	assert.Equal(t, "label", labelNode.FieldName, "Expected first child of 'signals' to be 'label'")
+	assert.Equal(t, "default_label", labelNode.ConfigDescription.Default.Value, "Expected default value for 'label'")
+}
+
+func TestParseConfigStruct_ArrayOfPrimitives(t *testing.T) {
+	type TestConfig struct {
+		Names []string `mapstructure:"names" desc:"List of names" default:"Alice,Bob,Charlie"`
+		Ports []int    `mapstructure:"ports" desc:"List of ports" default:"8080,9090"`
+	}
+
+	var cfg TestConfig
+	rootNode, err := ParseConfigStruct(cfg)
+	require.NoError(t, err, "Unexpected error during parsing config")
+
+	require.Len(t, rootNode.Children, 2, "Expected 2 child nodes at the root level")
+
+	// Проверка узла 'names'
+	namesNode := rootNode.Children[0]
+	assert.Equal(t, "names", namesNode.FieldName, "Expected first child node to be 'names'")
+	assert.False(t, namesNode.IsArrayOfStructs, "Expected 'names' node to not be marked as array of structs")
+	assert.True(t, namesNode.ConfigDescription.IsArray, "Expected 'names' node type to be marked as array of primitives")
+	assert.Equal(t, "string", namesNode.ConfigDescription.ValueType.String(), "Expected 'names' node type to be string")
+
+	defaultNames := namesNode.ConfigDescription.Default.Value.([]string)
+	require.Len(t, defaultNames, 3, "Expected 3 default names")
+	assert.Equal(t, "Alice", defaultNames[0], "First default name should be Alice")
+
+	// Проверка узла 'ports'
+	portsNode := rootNode.Children[1]
+	assert.Equal(t, "ports", portsNode.FieldName, "Expected second child node to be 'ports'")
+	assert.False(t, portsNode.IsArrayOfStructs, "Expected 'ports' node to not be marked as array of structs")
+	assert.True(t, portsNode.ConfigDescription.IsArray, "Expected 'ports' node type to be marked as array of primitives")
+	assert.Equal(t, "int", portsNode.ConfigDescription.ValueType.String(), "Expected 'ports' node type to be int")
+
+	defaultPorts := portsNode.ConfigDescription.Default.Value.([]int)
+	require.Len(t, defaultPorts, 2, "Expected 2 default ports")
+	assert.Equal(t, 8080, defaultPorts[0], "First default port should be 8080")
+}
+
+func TestParseConfigStruct_EmptyArray(t *testing.T) {
+	type TestConfig struct {
+		EmptyArray []string `mapstructure:"empty_array" desc:"An empty array"`
+	}
+
+	var cfg TestConfig
+	rootNode, err := ParseConfigStruct(cfg)
+	require.NoError(t, err, "Unexpected error during parsing config")
+
+	require.Len(t, rootNode.Children, 1, "Expected 1 child node at the root level")
+
+	emptyArrayNode := rootNode.Children[0]
+	assert.Equal(t, "empty_array", emptyArrayNode.FieldName, "Expected child node to be 'empty_array'")
+	assert.False(t, emptyArrayNode.IsArrayOfStructs, "Expected 'empty_array' to not be marked as array")
+	assert.True(t, emptyArrayNode.ConfigDescription.IsArray, "Expected 'empty_array' node type to be marked as array of primitives")
+	assert.Equal(t, "string", emptyArrayNode.ConfigDescription.ValueType.String(), "Expected 'empty_array' node type to be string")
+	assert.False(t, emptyArrayNode.ConfigDescription.Default.IsExist, "Expected no default value for 'empty_array'")
 }

@@ -9,6 +9,7 @@ import (
 
 type ConfigDescription struct {
 	ConfigNode *ConfigNode
+	IsArray    bool
 	ValueType  reflect.Kind
 	Default    struct {
 		IsExist bool
@@ -22,6 +23,8 @@ type ConfigNode struct {
 	Children    []*ConfigNode
 	Parent      *ConfigNode
 	Level       int
+
+	IsArrayOfStructs bool
 
 	ConfigDescription *ConfigDescription
 }
@@ -121,11 +124,12 @@ func (r *ConfigNode) AddChildNode(node *ConfigNode) error {
 	return nil
 }
 
-func (r *ConfigNode) SetConfigDescription(ValueType reflect.Kind, isDefaultExist bool, defaultValue interface{}) error {
+func (r *ConfigNode) SetConfigDescription(IsArray bool, ValueType reflect.Kind, isDefaultExist bool, defaultValue interface{}) error {
 	if len(r.Children) > 0 {
 		return fmt.Errorf("children in node != 0. setting item to node is not possible, node: %s", r.FieldName)
 	}
 	r.ConfigDescription = &ConfigDescription{
+		IsArray:   IsArray,
 		ValueType: ValueType,
 		Default: struct {
 			IsExist bool

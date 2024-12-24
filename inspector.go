@@ -25,7 +25,7 @@ func NewConfigInspector[T Configurable]() (*ConfigInspector[T], error) {
 
 // PrintConfigTemplate выводит шаблон конфигурационного файла.
 func (ci *ConfigInspector[T]) PrintConfigTemplate(printWithDescription bool) {
-	yamlOutput, err := helper.GenerateYAMLFromTree(ci.configTree, 0, printWithDescription)
+	yamlOutput, err := helper.GenerateYAMLFromTree(ci.configTree, "", printWithDescription)
 	if err != nil {
 		fmt.Println("Ошибка при создании YAML:", err)
 		return
