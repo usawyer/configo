@@ -2,33 +2,40 @@ package configo
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
+	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
-	"github.com/vsysa/configo/internal/helper"
-	"github.com/vsysa/configo/internal/parser"
+	"github.com/vsysa/configo/internal/parser/defaultValues"
+	"github.com/vsysa/configo/internal/parser/env"
+	"github.com/vsysa/configo/notifier"
 )
 
 const (
 	DefaultConfigPath = "./config.yml"
 )
 
-type ConfigManager[T Configurable] struct {
+var (
+	ConfigParsingError error = errors.New("error parsing config struct")
+)
+
+type ConfigManager[T any] struct {
 	config *T
 
 	configFilePath string
 
-	configUpdateNotifier *ConfigUpdateNotifier[T]
+	configUpdateNotifier *notifier.ConfigUpdateNotifier[T]
 	updateMu             sync.RWMutex
 	errorHandler         func(error)
 	v                    *viper.Viper
-	configTree           *parser.ConfigNode
 }
 
-func MustNewConfigManager[T Configurable](opts ...Option[T]) *ConfigManager[T] {
+func MustNewConfigManager[T any](opts ...Option[T]) *ConfigManager[T] {
 	out, err := NewConfigManager[T](opts...)
 	if err != nil {
 		panic(err)
@@ -36,26 +43,24 @@ func MustNewConfigManager[T Configurable](opts ...Option[T]) *ConfigManager[T] {
 	return out
 }
 
-func NewConfigManager[T Configurable](opts ...Option[T]) (*ConfigManager[T], error) {
+func NewConfigManager[T any](opts ...Option[T]) (*ConfigManager[T], error) {
 	r := &ConfigManager[T]{
 		configFilePath:       DefaultConfigPath,
-		configUpdateNotifier: NewConfigUpdateNotifier[T](),
-		errorHandler:         helper.DefaultHandleError,
-		v:                    viper.New(),
+		configUpdateNotifier: notifier.NewConfigUpdateNotifier[T](),
+		errorHandler: func(err error) {
+			log.Printf("ConfigManager error: %v", err)
+		},
+		v: viper.New(),
 	}
 
 	for _, opt := range opts {
 		opt(r)
 	}
 
-	var cfg T
-	var err error
-	r.configTree, err = parser.ParseConfigStruct(cfg)
+	err := r.setupViper(r.configFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing config struct: %w", err)
+		return nil, err
 	}
-
-	r.setupViper(r.configFilePath)
 	r.setupWatcher()
 
 	if _, err := r.updateConfig(); err != nil {
@@ -75,14 +80,8 @@ func (r *ConfigManager[T]) Config() T {
 	return *r.config
 }
 
-func (r *ConfigManager[T]) ChangeCh(ctx context.Context) <-chan ConfigUpdateMsg[T] {
+func (r *ConfigManager[T]) ChangeCh(ctx context.Context) <-chan notifier.ConfigUpdateMsg[T] {
 	return r.configUpdateNotifier.Subscribe(ctx)
-}
-
-func (r *ConfigManager[T]) SetErrorHandler(handler func(error)) {
-	r.updateMu.Lock()
-	defer r.updateMu.Unlock()
-	r.errorHandler = handler
 }
 
 func (r *ConfigManager[T]) updateConfig() (*T, error) {
@@ -108,33 +107,38 @@ func (r *ConfigManager[T]) loadConfig() (*T, error) {
 		return nil, fmt.Errorf("Unable to decode into struct: %v", err)
 	}
 
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("Validation error: %v", err)
+	if err := callValidateIfExists(cfg); err != nil {
+		return nil, fmt.Errorf("Validation error: %w", err)
 	}
 
 	return &cfg, nil
 }
 
-func (r *ConfigManager[T]) setupViper(configPath string) {
+func (r *ConfigManager[T]) setupViper(configPath string) error {
 	Viper := r.v
 
 	Viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	Viper.AutomaticEnv()
+	//Viper.AutomaticEnv()
 
 	Viper.SetConfigFile(configPath)
 
-	for _, item := range r.configTree.GetAllLeaves() {
-		if item.ConfigDescription.Default.IsExist {
-			Viper.SetDefault(strings.Join(item.GetFullPathParts(), "."), item.ConfigDescription.Default.Value)
-		}
-		// по дефолту viper сам связывает названия с переменными env, но мы это делаем для прозрачности
-		// и на случай если пользователь изменил название переменной. если пользователь написал env:"-",
-		// то автоматическое связывание все равно произойдет
-		// связываем переменную с названием env
-		if envName, exist := item.GetEnv(); exist {
-			Viper.BindEnv(strings.Join(item.GetFullPathParts(), "."), envName)
+	var configStruct T
+	defaults, err := defaultValues.GetDefaultValues(configStruct)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ConfigParsingError, err)
+	}
+	for _, v := range defaults {
+		Viper.SetDefault(v.BindKey, v.DefaultValue)
+	}
+
+	for _, v := range env.GetEnvs(configStruct) {
+		err := Viper.BindEnv(v.BindKey, v.EnvVar)
+		if err != nil {
+			return fmt.Errorf("error binding env var: %w", err)
 		}
 	}
+
+	return nil
 }
 
 func (r *ConfigManager[T]) setupWatcher() {
@@ -148,7 +152,7 @@ func (r *ConfigManager[T]) setupWatcher() {
 			return
 		}
 
-		r.configUpdateNotifier.NewEvent(ConfigUpdateMsg[T]{
+		r.configUpdateNotifier.NewEvent(notifier.ConfigUpdateMsg[T]{
 			OldConfig: oldConfig,
 			NewConfig: *newConfig,
 		})
@@ -157,4 +161,30 @@ func (r *ConfigManager[T]) setupWatcher() {
 	Viper.WatchConfig()
 }
 
-var _ IConfigManager[Configurable] = &ConfigManager[Configurable]{}
+func callValidateIfExists(in interface{}) error {
+
+	// Ищем метод Validate
+	method := reflect.ValueOf(in).MethodByName("Validate")
+	if !method.IsValid() {
+		return nil
+	}
+
+	// Проверяем сигнатуру метода
+	methodType := method.Type()
+	if methodType.NumIn() != 0 || methodType.NumOut() != 1 {
+		return nil
+	}
+
+	if methodType.Out(0).Name() != "error" {
+		return nil
+	}
+
+	results := method.Call(nil)
+	if err, ok := results[0].Interface().(error); ok {
+		return err
+	}
+
+	return nil
+}
+
+var _ IConfigManager[any] = &ConfigManager[any]{}

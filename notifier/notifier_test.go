@@ -1,12 +1,13 @@
-package configo
+package notifier
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Структуры для тестирования

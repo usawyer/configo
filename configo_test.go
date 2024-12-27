@@ -19,11 +19,13 @@ type ServerConfig struct {
 }
 
 type TestConfig struct {
-	AppName  string         `mapstructure:"appName" env:"app"`
-	Database DatabaseConfig `mapstructure:"database" env:"db"`
-	Server   ServerConfig   `mapstructure:"server"`
-	Statuses []string       `mapstructure:"statuses" desc:"Статусы" default:"a,b,c,aa,ab"`
-	Enable   bool           `mapstructure:"enable" desc:"Флаг для включения определенной функции" default:"true"`
+	AppName   string         `mapstructure:"appName" env:"app"`
+	Database  DatabaseConfig `mapstructure:"database" env:"db"`
+	Server    ServerConfig   `mapstructure:"server"`
+	Statuses  []string       `mapstructure:"statuses" desc:"Статусы" default:"a,b,c,aa,ab"`
+	Statuses2 []string       `mapstructure:"statuses2" desc:"Статусы2" default:"[\"a\",\"b\",\"c\",\"aa\",\"ab\"]"`
+	Enable    bool           `mapstructure:"enable" desc:"Флаг для включения определенной функции" default:"true"`
+	Disable   bool           `mapstructure:"-" env:"dis" desc:"Флаг для отключения определенной функции"`
 }
 
 func (c TestConfig) Validate() error {
@@ -124,7 +126,7 @@ func TestConfigManager_NestedEnvOverridesYAML(t *testing.T) {
 	yamlContent := `
 appName: "testapp"
 database:
-  url: "postgres://localhost:5432/db"
+  url: "localhost"
   username: "dbuser"
   password: "dbpass"
 server:
@@ -136,11 +138,12 @@ server:
 
 	// Устанавливаем переменные окружения для вложенных полей
 	setEnv(t, "APP", "envapp")
-	setEnv(t, "DATABASE_URL", "postgres://env-db:5432/db") // viper по дефолту сам определяет переменную env и это не отменить
+	setEnv(t, "DATABASE_URL", "envhost") // viper по дефолту сам определяет переменную env и это не отменить
 	setEnv(t, "DB_USERNAME", "envuser")
 	setEnv(t, "SERVER_PORT", "9090")
 	setEnv(t, "STATUSES", "a,b")
 	setEnv(t, "ENABLE", "true")
+	setEnv(t, "DIS", "true")
 	defer unsetEnv(t, "APP")
 	defer unsetEnv(t, "DATABASE_URL")
 	defer unsetEnv(t, "DB_USERNAME")
@@ -148,7 +151,7 @@ server:
 	defer unsetEnv(t, "STATUSES")
 	defer unsetEnv(t, "ENABLE")
 
-	cm, err := NewConfigManager[TestConfig](WithConfigFilePath[TestConfig](configPath))
+	cm, err := NewConfigManager(WithConfigFilePath[TestConfig](configPath))
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -159,8 +162,8 @@ server:
 	if config.AppName != "envapp" {
 		t.Errorf("Expected AppName to be 'envapp', got '%s'", config.AppName)
 	}
-	if config.Database.URL != "postgres://env-db:5432/db" { // env:"-" not override viper's default behavior
-		t.Errorf("Expected Database.URL to be 'env-db://localhost:5432/db', got '%s'", config.Database.URL)
+	if config.Database.URL != "localhost" {
+		t.Errorf("Expected Database.URL to be 'localhost', got '%s'", config.Database.URL)
 	}
 	if config.Database.Username != "envuser" {
 		t.Errorf("Expected Database.Username to be 'envuser', got '%s'", config.Database.Username)
@@ -179,6 +182,9 @@ server:
 	}
 	if config.Enable != true {
 		t.Errorf("Expected Enable to be true, got %v", config.Enable)
+	}
+	if config.Disable != true {
+		t.Errorf("Expected Disable to be true, got %v", config.Enable)
 	}
 }
 
@@ -213,6 +219,9 @@ server:
 	expectedStatuses := []string{"a", "b", "c", "aa", "ab"}
 	if !reflect.DeepEqual(config.Statuses, expectedStatuses) {
 		t.Errorf("Expected Statuses to be %v, got %v", expectedStatuses, config.Statuses)
+	}
+	if !reflect.DeepEqual(config.Statuses2, expectedStatuses) {
+		t.Errorf("Expected Statuses2 to be %v, got %v", expectedStatuses, config.Statuses2)
 	}
 	if config.Enable != true {
 		t.Errorf("Expected Enable to be true, got %v", config.Enable)

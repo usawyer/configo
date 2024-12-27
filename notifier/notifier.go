@@ -1,17 +1,24 @@
-package configo
+package notifier
 
 import (
 	"context"
 	"sync"
 )
 
-type ConfigUpdateNotifier[T Configurable] struct {
+// ConfigUpdateMsg представляет сообщение об обновлении конфигурации,
+// содержащее старую и новую версии конфигурации.
+type ConfigUpdateMsg[T any] struct {
+	OldConfig T
+	NewConfig T
+}
+
+type ConfigUpdateNotifier[T any] struct {
 	mu          sync.RWMutex
 	subscribers map[chan ConfigUpdateMsg[T]]struct{}
 }
 
 // NewEventBus создает новый eventBus.
-func NewConfigUpdateNotifier[T Configurable]() *ConfigUpdateNotifier[T] {
+func NewConfigUpdateNotifier[T any]() *ConfigUpdateNotifier[T] {
 	return &ConfigUpdateNotifier[T]{
 		subscribers: make(map[chan ConfigUpdateMsg[T]]struct{}),
 	}
