@@ -66,8 +66,8 @@ func (c *AppConfig) Validate() error {
 
 ```go
 cm, err := configo.NewConfigManager[AppConfig](
-    configo.WithConfigFilePath("./config.yml"),
-    configo.WithErrorHandler(func(err error) {
+    configo.WithConfigFilePath[AppConfig]("./config.yml"),
+    configo.WithErrorHandler[AppConfig](func(err error) {
         log.Printf("Configuration error: %v", err)
     }),
 )
