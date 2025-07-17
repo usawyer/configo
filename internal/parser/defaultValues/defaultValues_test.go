@@ -2,6 +2,7 @@ package defaultValues
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ func TestGetDefaultValues(t *testing.T) {
 		Timeout  float64           `mapstructure:"timeout" default:"30.5"`
 		Tags     []string          `mapstructure:"tags" default:"[\"tag1\",\"tag2\"]"`
 		Settings map[string]string `mapstructure:"settings" default:"{\"key1\":\"value1\"}"`
+		Duration time.Duration     `mapstructure:"duration" default:"1m5s"`
 	}
 
 	cfg := Config{}
@@ -28,6 +30,7 @@ func TestGetDefaultValues(t *testing.T) {
 		{BindKey: "timeout", DefaultValue: 30.5},
 		{BindKey: "tags", DefaultValue: []string{"tag1", "tag2"}},
 		{BindKey: "settings", DefaultValue: map[string]string{"key1": "value1"}},
+		{BindKey: "duration", DefaultValue: 1*time.Minute + 5*time.Second},
 	}
 
 	assert.EqualValues(t, expected, defaults)
