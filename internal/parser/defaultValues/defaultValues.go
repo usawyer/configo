@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type DefaultInfo struct {
@@ -99,6 +100,13 @@ func parseDefaultValues(t reflect.Type, parentBindKey string, lines *[]DefaultIn
 			}
 
 			defaultValue = mapPtr.Elem().Interface()
+		} else if field.Type == reflect.TypeOf(time.Duration(0)) {
+			durationVal, err := time.ParseDuration(defaultValStr)
+			if err != nil {
+				fmt.Printf("cannot parse default value \"%s\" as duration: %s", defaultValStr, err)
+				continue
+			}
+			defaultValue = durationVal
 		} else {
 			// Processing of single values (primitives)
 			switch fieldKind {
