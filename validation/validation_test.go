@@ -324,6 +324,71 @@ func TestIsValidCronExpression(t *testing.T) {
 	}
 }
 
+// TestIsValidRobfigCronDescriptor тестирует функцию IsValidRobfigCronDescriptor.
+func TestIsValidRobfigCronDescriptor(t *testing.T) {
+	tests := []struct {
+		name          string
+		fieldName     string
+		expression    string
+		expectedValid bool
+		expectedErr   string
+	}{
+		{
+			name:          "Valid @every expression",
+			fieldName:     "SyncJob",
+			expression:    "@every 2m",
+			expectedValid: true,
+			expectedErr:   "",
+		},
+		{
+			name:          "Valid @hourly expression",
+			fieldName:     "HourlyTask",
+			expression:    "@hourly",
+			expectedValid: true,
+			expectedErr:   "",
+		},
+		{
+			name:          "Invalid descriptor format",
+			fieldName:     "BrokenJob",
+			expression:    "@evry 5m",
+			expectedValid: false,
+			expectedErr:   "BrokenJob cron выражение '@evry 5m' недействительно:",
+		},
+		{
+			name:          "Invalid cron format in descriptor",
+			fieldName:     "BadIntervalJob",
+			expression:    "@every wrong",
+			expectedValid: false,
+			expectedErr:   "BadIntervalJob cron выражение '@every wrong' недействительно:",
+		},
+		{
+			name:          "Totally invalid string",
+			fieldName:     "GarbageJob",
+			expression:    "not a cron",
+			expectedValid: false,
+			expectedErr:   "GarbageJob cron выражение 'not a cron' недействительно:",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			valid, err := IsValidRobfigCronDescriptor(test.expression, test.fieldName)
+			if valid != test.expectedValid {
+				t.Errorf("expected validity %v, got %v", test.expectedValid, valid)
+			}
+			if err != nil && test.expectedErr == "" {
+				t.Errorf("expected no error, got error %v", err)
+			}
+			if err == nil && test.expectedErr != "" {
+				t.Errorf("expected error %s, got no error", test.expectedErr)
+			}
+			if err != nil && test.expectedErr != "" && !startsWith(err.Error(), test.expectedErr) {
+				t.Errorf("expected error message to start with '%s', got '%s'", test.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
 // startsWith checks if a string starts with a given prefix.
 func startsWith(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix

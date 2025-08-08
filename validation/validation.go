@@ -176,3 +176,12 @@ func IsValidCronExpression(expression string, fieldName string, isWithSeconds bo
 	}
 	return true, nil
 }
+
+// IsValidRobfigCronDescriptor проверяет валидность спец-выражений cron библиотеки robfig/cron (например, "@every 2m", "@hourly").
+func IsValidRobfigCronDescriptor(expression string, fieldName string) (bool, error) {
+	_, err := cron.ParseStandard(expression)
+	if err != nil {
+		return false, fmt.Errorf("%s cron выражение '%s' недействительно: %v", fieldName, expression, err)
+	}
+	return true, nil
+}
