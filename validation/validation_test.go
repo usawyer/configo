@@ -324,8 +324,8 @@ func TestIsValidCronExpression(t *testing.T) {
 	}
 }
 
-// TestIsValidRobfigCronDescriptor тестирует функцию IsValidRobfigCronDescriptor.
-func TestIsValidRobfigCronDescriptor(t *testing.T) {
+// TestIsValidRobfigCronExpression тестирует функцию IsValidRobfigCronExpression.
+func TestIsValidRobfigCronExpression(t *testing.T) {
 	tests := []struct {
 		name          string
 		fieldName     string
@@ -348,6 +348,20 @@ func TestIsValidRobfigCronDescriptor(t *testing.T) {
 			expectedErr:   "",
 		},
 		{
+			name:          "Valid standard cron expression",
+			fieldName:     "DailyJob",
+			expression:    "0 0 * * *",
+			expectedValid: true,
+			expectedErr:   "",
+		},
+		{
+			name:          "Valid standard cron with wildcard",
+			fieldName:     "WildcardJob",
+			expression:    "* * * * *",
+			expectedValid: true,
+			expectedErr:   "",
+		},
+		{
 			name:          "Invalid descriptor format",
 			fieldName:     "BrokenJob",
 			expression:    "@evry 5m",
@@ -362,6 +376,13 @@ func TestIsValidRobfigCronDescriptor(t *testing.T) {
 			expectedErr:   "BadIntervalJob cron выражение '@every wrong' недействительно:",
 		},
 		{
+			name:          "Invalid standard cron expression",
+			fieldName:     "BadCronJob",
+			expression:    "0 0 0 *",
+			expectedValid: false,
+			expectedErr:   "BadCronJob cron выражение '0 0 0 *' недействительно:",
+		},
+		{
 			name:          "Totally invalid string",
 			fieldName:     "GarbageJob",
 			expression:    "not a cron",
@@ -372,7 +393,7 @@ func TestIsValidRobfigCronDescriptor(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			valid, err := IsValidRobfigCronDescriptor(test.expression, test.fieldName)
+			valid, err := IsValidRobfigCronExpression(test.expression, test.fieldName)
 			if valid != test.expectedValid {
 				t.Errorf("expected validity %v, got %v", test.expectedValid, valid)
 			}
